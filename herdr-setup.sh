@@ -2,13 +2,14 @@
 #
 # herdr + Ghostty 개발 환경 셋업.
 #
-# 네 단계로 나뉘어 있고 각각 독립적으로 끌 수 있다. 바로 아래 토글에서
+# 다섯 단계로 나뉘어 있고 각각 독립적으로 끌 수 있다. 바로 아래 토글에서
 # 필요 없는 단계를 0으로 바꾸거나 그 줄을 통째로 주석 처리하면 건너뛴다.
 #
 #   [1] 설치           herdr(formula), Ghostty(cask)
 #   [2] 키 바인딩      ~/.config/herdr/config.toml
 #   [3] Ghostty 설정   ~/.config/ghostty/config.ghostty
 #   [4] 셸             ~/.zshrc 의 alias hd="herdr"
+#   [5] 에이전트 스킬  ~/.agents/skills/herdr
 #
 # 여러 번 실행해도 안전하다. 기존 파일은 내용이 다를 때만 백업 후 교체한다.
 #
@@ -24,6 +25,7 @@ STEP_INSTALL=${STEP_INSTALL:-1}   # [1] Homebrew로 herdr, Ghostty 설치
 STEP_KEYS=${STEP_KEYS:-1}         # [2] herdr 키 바인딩
 STEP_GHOSTTY=${STEP_GHOSTTY:-1}   # [3] Ghostty 설정
 STEP_SHELL=${STEP_SHELL:-1}       # [4] zsh alias
+STEP_SKILL=${STEP_SKILL:-1}       # [5] herdr 에이전트 스킬
 
 # ============================================================== 공용 함수
 
@@ -191,6 +193,34 @@ else
   off "[4] zsh alias"
 fi
 
+# ============================================================== [5] 에이전트 스킬
+#
+# 코딩 에이전트가 herdr CLI로 페인/탭/워크스페이스를 다루게 해주는 스킬.
+# ~/.agents/skills/herdr 에 설치되고 Claude Code 쪽으로는 심링크가 걸린다.
+# 스킬은 HERDR_ENV=1 일 때만 동작하므로 herdr 페인 안에서 에이전트를 띄울 것.
+
+if enabled STEP_SKILL; then
+  info "[5] herdr 에이전트 스킬"
+
+  if [[ -f $HOME/.agents/skills/herdr/SKILL.md ]]; then
+    skip "이미 설치됨: ~/.agents/skills/herdr"
+  elif ! command -v npx >/dev/null 2>&1; then
+    skip "건너뜀: npx가 없다 (Node.js 설치 후 다시 실행할 것)"
+  else
+    # 에이전트 포맷 중 일부(PromptScript)는 전역 설치를 지원하지 않아 부분
+    # 실패로 종료 코드가 0이 아닐 수 있다. 스킬 파일이 생겼는지로 판단한다.
+    npx -y skills add herdrdev/herdr --skill herdr -g || true
+
+    if [[ -f $HOME/.agents/skills/herdr/SKILL.md ]]; then
+      skip "설치: ~/.agents/skills/herdr"
+    else
+      skip "실패: 스킬 설치에 실패했다. 위 출력을 확인할 것"
+    fi
+  fi
+else
+  off "[5] herdr 에이전트 스킬"
+fi
+
 # ============================================================== 마무리
 
 info "완료"
@@ -200,6 +230,7 @@ cat <<'EOF'
       source ~/.zshrc                 # [4] hd alias
       herdr server reload-config      # [2] herdr 서버가 이미 실행 중일 때만
       Ghostty 재시작 또는 cmd+shift+, # [3] Ghostty 설정 reload
+      에이전트를 herdr 페인에서 실행   # [5] 스킬은 HERDR_ENV=1 에서만 동작
 
     herdr prefix 는 cmd+p. 도움말은 cmd+p 다음 ? 를 누를 것.
 EOF

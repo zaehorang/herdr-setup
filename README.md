@@ -28,6 +28,7 @@ Ghostty는 재시작하거나 `cmd+shift+,` 로 설정을 다시 읽는다.
 | `[2]` 키 바인딩 | herdr prefix 및 생성/제거 바인딩 | `~/.config/herdr/config.toml` |
 | `[3]` Ghostty 설정 | 폰트·테마·스플릿/탭 키바인딩 | `~/.config/ghostty/config.ghostty` |
 | `[4]` 셸 | `alias hd="herdr"` | `~/.zshrc` |
+| `[5]` 에이전트 스킬 | `npx skills add herdrdev/herdr --skill herdr -g` | `~/.agents/skills/herdr` |
 
 여러 번 실행해도 안전하다. 파일은 내용이 다를 때만 `<파일>.bak.<타임스탬프>` 로
 백업한 뒤 교체하고, 같으면 손대지 않는다. alias 도 중복 추가하지 않는다.
@@ -82,6 +83,30 @@ prefix 는 **`cmd+p`**. 도움말은 `cmd+p` 다음 `?`.
 | `rename_pane` | `prefix+shift+p` | 없음 |
 | `rename_tab` | `prefix+shift+t` | 없음 |
 | `rename_workspace` | `prefix+shift+w` | 없음 |
+
+## 에이전트 스킬
+
+`[5]` 단계가 herdr 공식 스킬을 전역 설치한다. 코딩 에이전트가 herdr CLI로
+페인/탭/워크스페이스를 살펴보고, 포커스를 뺏지 않고 페인을 쪼개고, 다른 페인의
+출력을 읽을 수 있게 된다.
+
+```sh
+npx skills add herdrdev/herdr --skill herdr -g
+```
+
+`~/.agents/skills/herdr` 에 설치되고 Claude Code 쪽(`~/.claude/skills/herdr`)으로는
+심링크가 걸린다.
+
+**스킬은 `HERDR_ENV=1` 일 때만 동작한다.** 이 값은 herdr 가 관리하는 페인 안에서만
+설정되므로, 에이전트는 herdr 페인 안에서 띄워야 한다. 밖에서 띄우면 스킬이
+herdr 안이 아니라고 말하고 멈춘다.
+
+```sh
+echo $HERDR_ENV   # 1 이어야 한다
+```
+
+설치 중 `PromptScript ... does not support global skill installation` 이 떠도
+무시해도 된다. Claude Code 를 포함한 나머지 에이전트 포맷에는 정상 설치된다.
 
 ## 알아둘 것
 
