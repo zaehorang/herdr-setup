@@ -8,7 +8,7 @@
 #   [1] 설치           herdr(formula), Ghostty(cask)
 #   [2] 키 바인딩      ~/.config/herdr/config.toml
 #   [3] Ghostty 설정   ~/.config/ghostty/config.ghostty
-#   [4] 셸             ~/.zshrc 의 alias hd="herdr"
+#   [4] 셸             ~/.zshrc 의 alias hd 와 스킬 동기화
 #   [5] 에이전트 스킬  ~/.agents/skills/herdr
 #
 # 여러 번 실행해도 안전하다. 기존 파일은 내용이 다를 때만 백업 후 교체한다.
@@ -57,6 +57,13 @@ install_file() {
   printf '%s\n' "$content" > "$dest"
   skip "작성: $dest"
 }
+
+# 검증에 실패한 단계를 기록해 마지막에 한 번에 알린다. 중간에 죽으면 뒤 단계가
+# 통째로 건너뛰어지므로, 실패해도 끝까지 간 뒤 종료 코드로 알린다.
+FAILED=""
+
+# .zshrc 에 절대경로를 써넣어야 하므로 레포를 어디에 클론했든 맞게 잡는다.
+HERE=$(cd "$(dirname "$0")" && pwd)
 
 # ============================================================== [1] 설치
 
@@ -131,7 +138,10 @@ rename_tab       = ""  # 원래 prefix+shift+t
 rename_workspace = ""  # 원래 prefix+shift+w
 
 # goto는 prefix+g 기본값 그대로 살아있다 (worktree가 w로 옮겨가면서 g가 비었다).'
-  herdr config check
+  if ! herdr config check; then
+    FAILED="$FAILED [2]"
+    skip "경고: config check 실패 — 위 출력을 확인할 것"
+  fi
 else
   off "[2] herdr 키 바인딩"
 fi
@@ -182,40 +192,45 @@ fi
 # ============================================================== [4] 셸
 
 if enabled STEP_SHELL; then
-  info "[4] zsh alias"
+  info "[4] 셸"
+
   if grep -q '^alias hd=' "$HOME/.zshrc" 2>/dev/null; then
     skip "이미 있음: alias hd"
   else
     printf '\n# Launch herdr with hd\nalias hd="herdr"\n' >> "$HOME/.zshrc"
-    skip ' 추가: alias hd="herdr" -> ~/.zshrc'
+    skip '추가: alias hd="herdr" -> ~/.zshrc'
+  fi
+
+  # 새 셸(= 새 herdr 페인)이 열릴 때마다 스킬을 바이너리와 맞춘다. 13ms 쯤 걸리고
+  # 바뀐 게 없으면 아무것도 출력하지 않는다. 에이전트 종류를 가리지 않는다는 게
+  # 각 에이전트의 세션 훅에 따로 넣는 것보다 나은 점이다.
+  if grep -q 'sync-skill.sh' "$HOME/.zshrc" 2>/dev/null; then
+    skip "이미 있음: 스킬 동기화"
+  else
+    printf '\n# Keep the herdr agent skill in sync with the installed binary\nif [ -x "%s/sync-skill.sh" ]; then "%s/sync-skill.sh"; fi\n' \
+      "$HERE" "$HERE" >> "$HOME/.zshrc"
+    skip "추가: 스킬 동기화 -> ~/.zshrc"
   fi
 else
-  off "[4] zsh alias"
+  off "[4] 셸"
 fi
 
 # ============================================================== [5] 에이전트 스킬
 #
 # 코딩 에이전트가 herdr CLI로 페인/탭/워크스페이스를 다루게 해주는 스킬.
-# ~/.agents/skills/herdr 에 설치되고 Claude Code 쪽으로는 심링크가 걸린다.
+# 정본은 설치된 바이너리다 (`herdr --skill`). GitHub 에서 받아오면 brew 로 깐
+# 버전과 어긋나므로 쓰지 않는다. 실제 작업은 sync-skill.sh 가 한다.
+#
 # 스킬은 HERDR_ENV=1 일 때만 동작하므로 herdr 페인 안에서 에이전트를 띄울 것.
 
 if enabled STEP_SKILL; then
   info "[5] herdr 에이전트 스킬"
 
-  if [[ -f $HOME/.agents/skills/herdr/SKILL.md ]]; then
-    skip "이미 설치됨: ~/.agents/skills/herdr"
-  elif ! command -v npx >/dev/null 2>&1; then
-    skip "건너뜀: npx가 없다 (Node.js 설치 후 다시 실행할 것)"
+  if ! command -v herdr >/dev/null 2>&1; then
+    skip "건너뜀: herdr 가 없다 ([1] 단계를 켜고 다시 실행할 것)"
   else
-    # 에이전트 포맷 중 일부(PromptScript)는 전역 설치를 지원하지 않아 부분
-    # 실패로 종료 코드가 0이 아닐 수 있다. 스킬 파일이 생겼는지로 판단한다.
-    npx -y skills add herdrdev/herdr --skill herdr -g || true
-
-    if [[ -f $HOME/.agents/skills/herdr/SKILL.md ]]; then
-      skip "설치: ~/.agents/skills/herdr"
-    else
-      skip "실패: 스킬 설치에 실패했다. 위 출력을 확인할 것"
-    fi
+    out=$("$HERE/sync-skill.sh")
+    skip "${out:-이미 최신: ~/.agents/skills/herdr}"
   fi
 else
   off "[5] herdr 에이전트 스킬"
@@ -227,10 +242,15 @@ info "완료"
 cat <<'EOF'
 
     적용하려면:
-      source ~/.zshrc                 # [4] hd alias
+      source ~/.zshrc                 # [4] alias · 스킬 동기화
       herdr server reload-config      # [2] herdr 서버가 이미 실행 중일 때만
       Ghostty 재시작 또는 cmd+shift+, # [3] Ghostty 설정 reload
       에이전트를 herdr 페인에서 실행   # [5] 스킬은 HERDR_ENV=1 에서만 동작
 
     herdr prefix 는 cmd+p. 도움말은 cmd+p 다음 ? 를 누를 것.
 EOF
+
+if [[ -n $FAILED ]]; then
+  printf '\n\033[1;31m실패한 단계:%s\033[0m 위 출력을 확인할 것.\n' "$FAILED" >&2
+  exit 1
+fi
