@@ -20,6 +20,30 @@ herdr server reload-config      # herdr 서버가 이미 실행 중일 때만
 
 Ghostty는 재시작하거나 `cmd+shift+,` 로 설정을 다시 읽는다.
 
+## 새 머신에서
+
+```sh
+git clone https://github.com/zaehorang/herdr-setup.git
+cd herdr-setup
+./herdr-setup.sh          # Homebrew 가 먼저 필요하다
+source ~/.zshrc
+```
+
+확인할 것 넷:
+
+| 확인 | 명령 | 기대 |
+| --- | --- | --- |
+| 키 바인딩 | `herdr config check` | `config: ok` |
+| Ghostty 설정 | `/Applications/Ghostty.app/Contents/MacOS/ghostty +show-config \| grep font-size` | `font-size = 18` |
+| 스킬 최신 | `diff <(herdr --skill) ~/.agents/skills/herdr/SKILL.md` | 출력 없음 |
+| 스킬 동작 | herdr 페인 안에서 `echo $HERDR_ENV` | `1` |
+
+스크립트가 실패한 단계가 있으면 마지막에 빨간 줄로 알리고 종료 코드 `1` 로 끝난다.
+
+에이전트에게 맡겨도 된다:
+
+> herdr-setup README 보고 이 머신 셋업해줘
+
 ## 하는 일
 
 | 단계 | 내용 | 대상 |
@@ -27,7 +51,7 @@ Ghostty는 재시작하거나 `cmd+shift+,` 로 설정을 다시 읽는다.
 | `[1]` 설치 | `brew install herdr`, `brew install --cask ghostty` | — |
 | `[2]` 키 바인딩 | herdr prefix 및 생성/제거 바인딩 | `~/.config/herdr/config.toml` |
 | `[3]` Ghostty 설정 | 폰트·테마·스플릿/탭 키바인딩 | `~/.config/ghostty/config.ghostty` |
-| `[4]` 셸 | `alias hd="herdr"` | `~/.zshrc` |
+| `[4]` 셸 | `alias hd="herdr"` · 스킬 동기화 한 줄 | `~/.zshrc` |
 | `[5]` 에이전트 스킬 | `herdr --skill` 을 파일로 (`sync-skill.sh`) | `~/.agents/skills/herdr` |
 
 여러 번 실행해도 안전하다. 파일은 내용이 다를 때만 `<파일>.bak.<타임스탬프>` 로
@@ -101,9 +125,15 @@ prefix 는 **`cmd+p`**. 도움말은 `cmd+p` 다음 `?`.
 심링크가 걸린다. 내용이 다를 때만 백업 후 교체하므로 여러 번 돌려도 안전하다.
 
 **herdr 를 업그레이드하면 스킬도 다시 맞춰야 한다.** 바이너리에 없던 명령이
-생겨도 스킬이 옛날 것이면 에이전트가 그 기능을 모른다. 자동으로 맞추려면
-세션 시작 훅에서 이 스크립트를 부르면 된다 (Claude Code 는 `~/.claude/settings.json`
-의 `SessionStart`). 바뀐 게 없으면 아무것도 출력하지 않는다.
+생겨도 스킬이 옛날 것이면 에이전트가 그 기능을 모른다.
+
+`[4]` 단계가 이걸 자동으로 만든다 — `.zshrc` 에 한 줄을 넣어 **새 셸이 열릴
+때마다**(= 새 herdr 페인마다) 맞춘다. 13ms 걸리고 바뀐 게 없으면 아무것도
+출력하지 않는다.
+
+각 에이전트의 세션 훅에 따로 넣는 방법도 있지만 셸 쪽이 낫다. 에이전트 종류를
+가리지 않아 Claude Code·Codex 가 한 번에 커버되고, 설정 파일(JSON)을 망가뜨릴
+길이 없다.
 
 ```sh
 diff <(herdr --skill) ~/.agents/skills/herdr/SKILL.md   # 무출력이면 최신

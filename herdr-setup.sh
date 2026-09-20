@@ -8,7 +8,7 @@
 #   [1] 설치           herdr(formula), Ghostty(cask)
 #   [2] 키 바인딩      ~/.config/herdr/config.toml
 #   [3] Ghostty 설정   ~/.config/ghostty/config.ghostty
-#   [4] 셸             ~/.zshrc 의 alias hd="herdr"
+#   [4] 셸             ~/.zshrc 의 alias hd 와 스킬 동기화
 #   [5] 에이전트 스킬  ~/.agents/skills/herdr
 #
 # 여러 번 실행해도 안전하다. 기존 파일은 내용이 다를 때만 백업 후 교체한다.
@@ -61,6 +61,9 @@ install_file() {
 # 검증에 실패한 단계를 기록해 마지막에 한 번에 알린다. 중간에 죽으면 뒤 단계가
 # 통째로 건너뛰어지므로, 실패해도 끝까지 간 뒤 종료 코드로 알린다.
 FAILED=""
+
+# .zshrc 에 절대경로를 써넣어야 하므로 레포를 어디에 클론했든 맞게 잡는다.
+HERE=$(cd "$(dirname "$0")" && pwd)
 
 # ============================================================== [1] 설치
 
@@ -189,15 +192,27 @@ fi
 # ============================================================== [4] 셸
 
 if enabled STEP_SHELL; then
-  info "[4] zsh alias"
+  info "[4] 셸"
+
   if grep -q '^alias hd=' "$HOME/.zshrc" 2>/dev/null; then
     skip "이미 있음: alias hd"
   else
     printf '\n# Launch herdr with hd\nalias hd="herdr"\n' >> "$HOME/.zshrc"
-    skip ' 추가: alias hd="herdr" -> ~/.zshrc'
+    skip '추가: alias hd="herdr" -> ~/.zshrc'
+  fi
+
+  # 새 셸(= 새 herdr 페인)이 열릴 때마다 스킬을 바이너리와 맞춘다. 13ms 쯤 걸리고
+  # 바뀐 게 없으면 아무것도 출력하지 않는다. 에이전트 종류를 가리지 않는다는 게
+  # 각 에이전트의 세션 훅에 따로 넣는 것보다 나은 점이다.
+  if grep -q 'sync-skill.sh' "$HOME/.zshrc" 2>/dev/null; then
+    skip "이미 있음: 스킬 동기화"
+  else
+    printf '\n# Keep the herdr agent skill in sync with the installed binary\nif [ -x "%s/sync-skill.sh" ]; then "%s/sync-skill.sh"; fi\n' \
+      "$HERE" "$HERE" >> "$HOME/.zshrc"
+    skip "추가: 스킬 동기화 -> ~/.zshrc"
   fi
 else
-  off "[4] zsh alias"
+  off "[4] 셸"
 fi
 
 # ============================================================== [5] 에이전트 스킬
@@ -214,7 +229,7 @@ if enabled STEP_SKILL; then
   if ! command -v herdr >/dev/null 2>&1; then
     skip "건너뜀: herdr 가 없다 ([1] 단계를 켜고 다시 실행할 것)"
   else
-    out=$("$(dirname "$0")/sync-skill.sh")
+    out=$("$HERE/sync-skill.sh")
     skip "${out:-이미 최신: ~/.agents/skills/herdr}"
   fi
 else
@@ -227,7 +242,7 @@ info "완료"
 cat <<'EOF'
 
     적용하려면:
-      source ~/.zshrc                 # [4] hd alias
+      source ~/.zshrc                 # [4] alias · 스킬 동기화
       herdr server reload-config      # [2] herdr 서버가 이미 실행 중일 때만
       Ghostty 재시작 또는 cmd+shift+, # [3] Ghostty 설정 reload
       에이전트를 herdr 페인에서 실행   # [5] 스킬은 HERDR_ENV=1 에서만 동작
