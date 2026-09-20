@@ -28,7 +28,7 @@ Ghostty는 재시작하거나 `cmd+shift+,` 로 설정을 다시 읽는다.
 | `[2]` 키 바인딩 | herdr prefix 및 생성/제거 바인딩 | `~/.config/herdr/config.toml` |
 | `[3]` Ghostty 설정 | 폰트·테마·스플릿/탭 키바인딩 | `~/.config/ghostty/config.ghostty` |
 | `[4]` 셸 | `alias hd="herdr"` | `~/.zshrc` |
-| `[5]` 에이전트 스킬 | `npx skills add herdrdev/herdr --skill herdr -g` | `~/.agents/skills/herdr` |
+| `[5]` 에이전트 스킬 | `herdr --skill` 을 파일로 (`sync-skill.sh`) | `~/.agents/skills/herdr` |
 
 여러 번 실행해도 안전하다. 파일은 내용이 다를 때만 `<파일>.bak.<타임스탬프>` 로
 백업한 뒤 교체하고, 같으면 손대지 않는다. alias 도 중복 추가하지 않는다.
@@ -90,12 +90,27 @@ prefix 는 **`cmd+p`**. 도움말은 `cmd+p` 다음 `?`.
 페인/탭/워크스페이스를 살펴보고, 포커스를 뺏지 않고 페인을 쪼개고, 다른 페인의
 출력을 읽을 수 있게 된다.
 
+**정본은 설치된 바이너리다.** `herdr --skill` 이 자기 버전에 맞는 SKILL.md 를
+그대로 뱉으므로 그걸 파일로 쓴다.
+
 ```sh
-npx skills add herdrdev/herdr --skill herdr -g
+./sync-skill.sh          # [5] 단계가 부르는 것과 같은 스크립트
 ```
 
 `~/.agents/skills/herdr` 에 설치되고 Claude Code 쪽(`~/.claude/skills/herdr`)으로는
-심링크가 걸린다.
+심링크가 걸린다. 내용이 다를 때만 백업 후 교체하므로 여러 번 돌려도 안전하다.
+
+**herdr 를 업그레이드하면 스킬도 다시 맞춰야 한다.** 바이너리에 없던 명령이
+생겨도 스킬이 옛날 것이면 에이전트가 그 기능을 모른다. 자동으로 맞추려면
+세션 시작 훅에서 이 스크립트를 부르면 된다 (Claude Code 는 `~/.claude/settings.json`
+의 `SessionStart`). 바뀐 게 없으면 아무것도 출력하지 않는다.
+
+```sh
+diff <(herdr --skill) ~/.agents/skills/herdr/SKILL.md   # 무출력이면 최신
+```
+
+> GitHub 에서 받아오는 `npx skills add herdrdev/herdr` 는 쓰지 않는다. brew 로 깐
+> 바이너리와 버전이 따로 놀아 실제로 어긋났었다. Node.js 의존도 사라진다.
 
 **스킬은 `HERDR_ENV=1` 일 때만 동작한다.** 이 값은 herdr 가 관리하는 페인 안에서만
 설정되므로, 에이전트는 herdr 페인 안에서 띄워야 한다. 밖에서 띄우면 스킬이
@@ -104,9 +119,6 @@ herdr 안이 아니라고 말하고 멈춘다.
 ```sh
 echo $HERDR_ENV   # 1 이어야 한다
 ```
-
-설치 중 `PromptScript ... does not support global skill installation` 이 떠도
-무시해도 된다. Claude Code 를 포함한 나머지 에이전트 포맷에는 정상 설치된다.
 
 ## 알아둘 것
 

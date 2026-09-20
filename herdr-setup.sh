@@ -58,6 +58,10 @@ install_file() {
   skip "작성: $dest"
 }
 
+# 검증에 실패한 단계를 기록해 마지막에 한 번에 알린다. 중간에 죽으면 뒤 단계가
+# 통째로 건너뛰어지므로, 실패해도 끝까지 간 뒤 종료 코드로 알린다.
+FAILED=""
+
 # ============================================================== [1] 설치
 
 if enabled STEP_INSTALL; then
@@ -131,7 +135,10 @@ rename_tab       = ""  # 원래 prefix+shift+t
 rename_workspace = ""  # 원래 prefix+shift+w
 
 # goto는 prefix+g 기본값 그대로 살아있다 (worktree가 w로 옮겨가면서 g가 비었다).'
-  herdr config check
+  if ! herdr config check; then
+    FAILED="$FAILED [2]"
+    skip "경고: config check 실패 — 위 출력을 확인할 것"
+  fi
 else
   off "[2] herdr 키 바인딩"
 fi
@@ -196,26 +203,19 @@ fi
 # ============================================================== [5] 에이전트 스킬
 #
 # 코딩 에이전트가 herdr CLI로 페인/탭/워크스페이스를 다루게 해주는 스킬.
-# ~/.agents/skills/herdr 에 설치되고 Claude Code 쪽으로는 심링크가 걸린다.
+# 정본은 설치된 바이너리다 (`herdr --skill`). GitHub 에서 받아오면 brew 로 깐
+# 버전과 어긋나므로 쓰지 않는다. 실제 작업은 sync-skill.sh 가 한다.
+#
 # 스킬은 HERDR_ENV=1 일 때만 동작하므로 herdr 페인 안에서 에이전트를 띄울 것.
 
 if enabled STEP_SKILL; then
   info "[5] herdr 에이전트 스킬"
 
-  if [[ -f $HOME/.agents/skills/herdr/SKILL.md ]]; then
-    skip "이미 설치됨: ~/.agents/skills/herdr"
-  elif ! command -v npx >/dev/null 2>&1; then
-    skip "건너뜀: npx가 없다 (Node.js 설치 후 다시 실행할 것)"
+  if ! command -v herdr >/dev/null 2>&1; then
+    skip "건너뜀: herdr 가 없다 ([1] 단계를 켜고 다시 실행할 것)"
   else
-    # 에이전트 포맷 중 일부(PromptScript)는 전역 설치를 지원하지 않아 부분
-    # 실패로 종료 코드가 0이 아닐 수 있다. 스킬 파일이 생겼는지로 판단한다.
-    npx -y skills add herdrdev/herdr --skill herdr -g || true
-
-    if [[ -f $HOME/.agents/skills/herdr/SKILL.md ]]; then
-      skip "설치: ~/.agents/skills/herdr"
-    else
-      skip "실패: 스킬 설치에 실패했다. 위 출력을 확인할 것"
-    fi
+    out=$("$(dirname "$0")/sync-skill.sh")
+    skip "${out:-이미 최신: ~/.agents/skills/herdr}"
   fi
 else
   off "[5] herdr 에이전트 스킬"
@@ -234,3 +234,8 @@ cat <<'EOF'
 
     herdr prefix 는 cmd+p. 도움말은 cmd+p 다음 ? 를 누를 것.
 EOF
+
+if [[ -n $FAILED ]]; then
+  printf '\n\033[1;31m실패한 단계:%s\033[0m 위 출력을 확인할 것.\n' "$FAILED" >&2
+  exit 1
+fi
