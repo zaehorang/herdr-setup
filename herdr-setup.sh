@@ -204,11 +204,15 @@ if enabled STEP_SHELL; then
   # 새 셸(= 새 herdr 페인)이 열릴 때마다 스킬을 바이너리와 맞춘다. 13ms 쯤 걸리고
   # 바뀐 게 없으면 아무것도 출력하지 않는다. 에이전트 종류를 가리지 않는다는 게
   # 각 에이전트의 세션 훅에 따로 넣는 것보다 나은 점이다.
+  #
+  # 레포 경로를 절대경로로 박으므로 레포를 옮기면 이 줄이 헛주소를 가리킨다.
+  # 그때 조용히 건너뛰면 동기화가 멈춘 걸 눈치챌 방법이 없다. herdr 는 스킬이
+  # 낡아도 조용히 틀리므로, 여기서만큼은 없을 때 시끄럽게 알린다.
   if grep -q 'sync-skill.sh' "$HOME/.zshrc" 2>/dev/null; then
     skip "이미 있음: 스킬 동기화"
   else
-    printf '\n# Keep the herdr agent skill in sync with the installed binary\nif [ -x "%s/sync-skill.sh" ]; then "%s/sync-skill.sh"; fi\n' \
-      "$HERE" "$HERE" >> "$HOME/.zshrc"
+    printf '\n# Keep the herdr agent skill in sync with the installed binary\nif [ -x "%s/sync-skill.sh" ]; then\n  "%s/sync-skill.sh"\nelse\n  echo "herdr-setup 이 %s 에 없다. herdr 스킬 동기화가 꺼져 있음 (옮긴 위치에서 herdr-setup.sh 를 다시 실행할 것)." >&2\nfi\n' \
+      "$HERE" "$HERE" "$HERE" >> "$HOME/.zshrc"
     skip "추가: 스킬 동기화 -> ~/.zshrc"
   fi
 else
